@@ -1,3 +1,4 @@
+import os
 import hashlib
 import random
 import string
@@ -6,9 +7,7 @@ from datetime import datetime
 import sqlite3
 import csv
 import io
-import os
 import re
-import json
 
 from telegram import Update, ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
@@ -22,7 +21,10 @@ from telegram.ext import (
 )
 
 # ---------------- CONFIGURATION ----------------
-BOT_TOKEN = os.environ.get("BOT_TOKEN", "8925659690:AAGPbmj8nki6p_dn1aGzTO4iTl7ptJn_nDU")
+BOT_TOKEN = os.environ.get("BOT_TOKEN")
+if not BOT_TOKEN:
+    print("ERROR: BOT_TOKEN environment variable is not set!")
+    exit(1)
 
 # Multiple Admin IDs
 ADMIN_IDS = [8212595643, 8235339975]
@@ -1782,7 +1784,24 @@ def main():
 
     print("🤖 Share2Pay Bot is running...")
     print(f"👥 Admin IDs: {ADMIN_IDS}")
-    app.run_polling()
+    
+    # Render or Production environment
+    if os.environ.get("RENDER"):
+        port = int(os.environ.get("PORT", 10000))
+        webhook_url = os.environ.get("RENDER_EXTERNAL_URL", "")
+        if webhook_url:
+            print(f"🌐 Running with webhook on port {port}")
+            app.run_webhook(
+                listen="0.0.0.0",
+                port=port,
+                url_path=BOT_TOKEN,
+                webhook_url=f"{webhook_url}/{BOT_TOKEN}"
+            )
+        else:
+            print("⚠️ RENDER_EXTERNAL_URL not set, falling back to polling")
+            app.run_polling()
+    else:
+        app.run_polling()
 
 if __name__ == '__main__':
     main()
