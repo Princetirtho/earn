@@ -310,7 +310,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return USERNAME
     
     # Check if user is blocked
-    if user[10] == 1:
+    if len(user) > 10 and user[10] == 1:
         await update.message.reply_text(
             "🚫 **আপনি ব্লক করা হয়েছে!**\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -453,7 +453,7 @@ async def handle_messages(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
 
     # Check if user is blocked
-    if user[10] == 1:
+    if len(user) > 10 and user[10] == 1:
         await update.message.reply_text(
             "🚫 **আপনি ব্লক করা হয়েছে!**\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -939,7 +939,6 @@ async def admin_search_txn(update: Update, context: ContextTypes.DEFAULT_TYPE):
         )
         return ConversationHandler.END
     
-    msg = "🔍 **ট্রানজেকশন সার্চ রেজাল্ট**\n━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
     for i, txn in enumerate(transactions, 1):
         txn_type = "ডিপোজিট" if txn[3] == "deposit" else "উইথড্র"
         status_text = "✅ অ্যাপ্রুভড" if txn[5] == "approved" else "⏳ পেন্ডিং" if txn[5] == "pending" else "❌ রিজেক্টড"
@@ -1246,14 +1245,17 @@ async def receive_txnid(update: Update, context: ContextTypes.DEFAULT_TYPE):
     conn.commit()
     conn.close()
 
-    await update.message.reply_text(
-        "✅ **তথ্য জমা হয়েছে!** 📤\n\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━\n"
-        "আপনার পেমেন্ট রিকুয়েস্ট অ্যাডমিনের কাছে পাঠানো হয়েছে।\n"
-        "⏳ অ্যাডমিন চেক করে অ্যাক্টিভেট করবেন।\n\n"
-        "📌 অনুগ্রহ করে অপেক্ষা করুন...\n"
-        "━━━━━━━━━━━━━━━━━━━━━━━━"
-    )
+    try:
+        await update.message.reply_text(
+            "✅ **তথ্য জমা হয়েছে!** 📤\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "আপনার পেমেন্ট রিকুয়েস্ট অ্যাডমিনের কাছে পাঠানো হয়েছে।\n"
+            "⏳ অ্যাডমিন চেক করে অ্যাক্টিভেট করবেন।\n\n"
+            "📌 অনুগ্রহ করে অপেক্ষা করুন...\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━"
+        )
+    except Exception as e:
+        logging.error(f"Failed to send confirmation to user: {e}")
 
     btn = InlineKeyboardMarkup([
         [InlineKeyboardButton("✅ অ্যাপ্রুভ", callback_data=f"app_pay_{txn_db_id}_{user_id}"),
@@ -1269,22 +1271,26 @@ async def receive_txnid(update: Update, context: ContextTypes.DEFAULT_TYPE):
         info = f"🧾 TxnID: `{txn_id}`"
     
     for admin_id in ADMIN_IDS:
-        await context.bot.send_message(
-            chat_id=admin_id,
-            text=(
-                f"📥 **নতুন পেমেন্ট**\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"🆔 ইউজার আইডি: `{user_id}`\n"
-                f"👤 ইউজারনেম: {username}\n"
-                f"{method_emoji} পেমেন্ট মেথড: {method_name}\n"
-                f"{info}\n"
-                f"💰 পরিমাণ: ৩০ টাকা\n"
-                f"📅 সময়: {datetime.now().strftime('%d %b, %Y %I:%M %p')}\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━"
-            ),
-            reply_markup=btn,
-            parse_mode='Markdown'
-        )
+        try:
+            await context.bot.send_message(
+                chat_id=admin_id,
+                text=(
+                    f"📥 **নতুন পেমেন্ট**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🆔 ইউজার আইডি: `{user_id}`\n"
+                    f"👤 ইউজারনেম: {username}\n"
+                    f"{method_emoji} পেমেন্ট মেথড: {method_name}\n"
+                    f"{info}\n"
+                    f"💰 পরিমাণ: ৩০ টাকা\n"
+                    f"📅 সময়: {datetime.now().strftime('%d %b, %Y %I:%M %p')}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━"
+                ),
+                reply_markup=btn,
+                parse_mode='Markdown'
+            )
+        except Exception as e:
+            logging.error(f"Failed to send payment notification to admin {admin_id}: {e}")
+    
     return ConversationHandler.END
 
 # ---------------- ADMIN ACTIONS ----------------
@@ -1586,22 +1592,26 @@ async def withdraw_amount(update: Update, context: ContextTypes.DEFAULT_TYPE):
     method_emoji = "📱" if "বিকাশ" in method else "💳"
     
     for admin_id in ADMIN_IDS:
-        await context.bot.send_message(
-            chat_id=admin_id,
-            text=(
-                f"📤 **নতুন উইথড্র**\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"🆔 ইউজার আইডি: `{user_id}`\n"
-                f"👤 ইউজারনেম: {username}\n"
-                f"{method_emoji} উইথড্র মেথড: {method_name}\n"
-                f"📱 নম্বর: `{phone}`\n"
-                f"💵 পরিমাণ: {amount} টাকা\n"
-                f"📅 সময়: {datetime.now().strftime('%d %b, %Y %I:%M %p')}\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━"
-            ),
-            reply_markup=btn,
-            parse_mode='Markdown'
-        )
+        try:
+            await context.bot.send_message(
+                chat_id=admin_id,
+                text=(
+                    f"📤 **নতুন উইথড্র**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🆔 ইউজার আইডি: `{user_id}`\n"
+                    f"👤 ইউজারনেম: {username}\n"
+                    f"{method_emoji} উইথড্র মেথড: {method_name}\n"
+                    f"📱 নম্বর: `{phone}`\n"
+                    f"💵 পরিমাণ: {amount} টাকা\n"
+                    f"📅 সময়: {datetime.now().strftime('%d %b, %Y %I:%M %p')}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━"
+                ),
+                reply_markup=btn,
+                parse_mode='Markdown'
+            )
+        except Exception as e:
+            logging.error(f"Failed to send withdraw notification to admin {admin_id}: {e}")
+    
     return ConversationHandler.END
 
 # ---------------- SUPPORT ----------------
@@ -1629,19 +1639,22 @@ async def receive_support(update: Update, context: ContextTypes.DEFAULT_TYPE):
     context.user_data['in_support'] = False
     
     for admin_id in ADMIN_IDS:
-        await context.bot.send_message(
-            chat_id=admin_id,
-            text=(
-                f"📩 **নতুন সাপোর্ট মেসেজ**\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
-                f"👤 ইউজার আইডি: `{user_id}`\n"
-                f"👤 ইউজারনেম: {user[1] if user else 'N/A'}\n"
-                f"💬 বার্তা:\n{msg}\n"
-                f"📅 সময়: {datetime.now().strftime('%d %b, %Y %I:%M %p')}\n"
-                f"━━━━━━━━━━━━━━━━━━━━━━━━"
-            ),
-            parse_mode='Markdown'
-        )
+        try:
+            await context.bot.send_message(
+                chat_id=admin_id,
+                text=(
+                    f"📩 **নতুন সাপোর্ট মেসেজ**\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"👤 ইউজার আইডি: `{user_id}`\n"
+                    f"👤 ইউজারনেম: {user[1] if user else 'N/A'}\n"
+                    f"💬 বার্তা:\n{msg}\n"
+                    f"📅 সময়: {datetime.now().strftime('%d %b, %Y %I:%M %p')}\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━━━━"
+                ),
+                parse_mode='Markdown'
+            )
+        except Exception as e:
+            logging.error(f"Failed to send support message to admin {admin_id}: {e}")
     
     await update.message.reply_text(
         "✅ **আপনার বার্তা পাঠানো হয়েছে!** 📨\n"
@@ -1679,6 +1692,21 @@ async def copy_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     link = query.data.replace('copy_', '')
     await query.message.reply_text(f"`{link}`", parse_mode='Markdown')
+
+# ---------------- ERROR HANDLER ----------------
+async def error_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Log the error and send a telegram message to notify the developer."""
+    logging.error(msg="Exception while handling an update:", exc_info=context.error)
+    
+    # Send error to admin
+    for admin_id in ADMIN_IDS:
+        try:
+            await context.bot.send_message(
+                chat_id=admin_id,
+                text=f"❌ **Error occurred:**\n{str(context.error)[:500]}"
+            )
+        except:
+            pass
 
 # ---------------- MAIN ----------------
 def main():
@@ -1781,27 +1809,15 @@ def main():
     
     # Main message handler
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_messages))
+    
+    # Error handler
+    app.add_error_handler(error_handler)
 
     print("🤖 Share2Pay Bot is running...")
     print(f"👥 Admin IDs: {ADMIN_IDS}")
     
-    # Render or Production environment
-    if os.environ.get("RENDER"):
-        port = int(os.environ.get("PORT", 10000))
-        webhook_url = os.environ.get("RENDER_EXTERNAL_URL", "")
-        if webhook_url:
-            print(f"🌐 Running with webhook on port {port}")
-            app.run_webhook(
-                listen="0.0.0.0",
-                port=port,
-                url_path=BOT_TOKEN,
-                webhook_url=f"{webhook_url}/{BOT_TOKEN}"
-            )
-        else:
-            print("⚠️ RENDER_EXTERNAL_URL not set, falling back to polling")
-            app.run_polling()
-    else:
-        app.run_polling()
+    # Run with polling (works on both local and Render)
+    app.run_polling(poll_interval=1.0)
 
 if __name__ == '__main__':
     main()
